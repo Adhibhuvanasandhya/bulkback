@@ -1,17 +1,22 @@
-const express = require("express")
-const cors = require("cors")
+require("dotenv").config();
+const express = require("express");
+const cors = require("cors");
 const nodemailer = require("nodemailer");
-const bodyParser = require('body-parser');
-const mongoose = require("mongoose")
+const bodyParser = require("body-parser");
+const mongoose = require("mongoose");
 
-const app = express()
-app.use(cors())
-app.use(express.json())
+const app = express();
+
+// Middleware
+app.use(cors({
+  origin: 'https://bulkfront.onrender.com/', // Replace with your frontend URL
+  methods: ['GET', 'POST'],
+}));
+app.use(express.json());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
 const users = [];
-
 
 // Signup route
 app.post('/signup', (req, res) => {
@@ -33,68 +38,56 @@ app.post('/login', (req, res) => {
   res.status(200).json({ message: "Login successful!" });
 });
 
+// MongoDB connection
+mongoose.connect(process.env.DB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(() => console.log("Connected to DB"))
+  .catch(err => console.error("Failed to connect to DB:", err));
 
+// Define the Credential schema and model
+const Credential = mongoose.model("Credential", {}, "bulkmail");
 
-mongoose.connect("mongodb+srv://sandhya:1234@cluster0.l7vwr.mongodb.net/passkey?retryWrites=true&w=majority&appName=Cluster0").then(function () {
-  console.log("connected to DB")
-}).catch(function () {
-  console.log("Failed to connect")
-})
+// Email-sending route
+app.post("/sendemail", async (req, res) => {
+  const { msg, emailList } = req.body;
 
+  try {
+    const credentials = await Credential.find();
+    if (!credentials || credentials.length === 0) {
+      return res.status(500).json({ message: "No email credentials found!" });
+    }
 
-const credential = mongoose.model("credential", {}, "bulkmail")
+    const { user, pass } = credentials[0].toJSON();
 
-
-
-app.post("/sendemail", function (req, res) {
-  var msg = req.body.msg
-  var emailList = req.body.emailList
-
-  credential.find().then(function (data) {
     const transporter = nodemailer.createTransport({
       service: "gmail",
-      auth: {
-        user: data[0].toJSON().user,
-        pass: data[0].toJSON().pass,
-      },
+      auth: { user, pass },
     });
 
-
-    new Promise(async function (resolve, reject) {
+    // Send emails to all recipients
+    for (const email of emailList) {
       try {
-        for (var i = 0; i < emailList.length; i++) {
-          await transporter.sendMail(
-            {
-              from: "sandhyaponrajan.l@gmail.com",
-              to: emailList[i],
-              subject: "A message from Bulk Mail App",
-              text: msg
-            },
-
-          )
-          console.log("Email sent to:" + emailList[i])
-        }
-        resolve("Success")
-
+        await transporter.sendMail({
+          from: user,
+          to: email,
+          subject: "A message from Bulk Mail App",
+          text: msg,
+        });
+        console.log("Email sent to:", email);
+      } catch (err) {
+        console.error(`Error sending email to ${email}:`, err);
+        return res.status(500).json({ message: "Failed to send some emails." });
       }
-      catch (error) {
-        reject("Failed")
-      }
+    }
 
+    res.status(200).json({ message: "Emails sent successfully!" });
+  } catch (err) {
+    console.error("Error fetching email credentials:", err);
+    res.status(500).json({ message: "Internal server error." });
+  }
+});
 
-    }).then(function () {
-      res.send(true)
-    })
-      .catch(function () {
-        res.send(false)
-      })
-
-  }).catch(function (error) {
-    console.log(error)
-  })
-
-})
-
-app.listen(5000, function () {
-  console.log("Server started...")
-})
+// Start the server
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`Server started on port ${PORT}...`);
+});
