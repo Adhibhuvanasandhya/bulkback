@@ -7,11 +7,15 @@ const mongoose = require("mongoose");
 
 const app = express();
 
-// Middleware
+
+// Configure CORS
 app.use(cors({
-  origin: 'https://bulkfront.onrender.com/', // Replace with your frontend URL
-  methods: ['GET', 'POST'],
+  origin: "https://bulkfront.onrender.com", // Replace with your frontend domain
+  methods: ["GET", "POST"], // Specify allowed HTTP methods
+  allowedHeaders: ["Content-Type", "Authorization"], // Specify allowed headers
+  credentials: true, // Allow credentials (optional)
 }));
+
 app.use(express.json());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
