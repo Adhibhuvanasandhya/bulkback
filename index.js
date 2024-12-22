@@ -8,26 +8,23 @@ const mongoose = require("mongoose");
 const app = express();
 
 // Configure CORS
-app.use(
-  cors({
-    origin: "https://bulkfront.onrender.com", // Replace with your frontend domain
-    methods: ["GET", "POST"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true,
-  })
-);
+app.use(cors({
+  origin: "https://bulkfront.onrender.com", // Replace with your frontend domain
+  methods: ["GET", "POST"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true,
+}));
 
 app.use(express.json());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// In-memory users for signup and login (replace with DB in production)
 const users = [];
 
 // Signup route
-app.post("/signup", (req, res) => {
+app.post('/signup', (req, res) => {
   const { username, password } = req.body;
-  if (users.find((user) => user.username === username)) {
+  if (users.find(user => user.username === username)) {
     return res.status(400).json({ message: "User already exists!" });
   }
   users.push({ username, password });
@@ -35,9 +32,9 @@ app.post("/signup", (req, res) => {
 });
 
 // Login route
-app.post("/login", (req, res) => {
+app.post('/login', (req, res) => {
   const { username, password } = req.body;
-  const user = users.find((u) => u.username === username && u.password === password);
+  const user = users.find(u => u.username === username && u.password === password);
   if (!user) {
     return res.status(400).json({ message: "Invalid credentials!" });
   }
@@ -45,12 +42,11 @@ app.post("/login", (req, res) => {
 });
 
 // MongoDB connection
-mongoose
-  .connect(process.env.DB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+mongoose.connect(process.env.DB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => console.log("Connected to DB"))
-  .catch((err) => console.error("Failed to connect to DB:", err));
+  .catch(err => console.error("Failed to connect to DB:", err));
 
-// Credential schema and model
+// Define the Credential schema and model
 const Credential = mongoose.model("Credential", {}, "bulkmail");
 
 // Email-sending route
@@ -70,6 +66,7 @@ app.post("/sendemail", async (req, res) => {
       auth: { user, pass },
     });
 
+    const results = [];
     for (const email of emailList) {
       try {
         await transporter.sendMail({
@@ -78,13 +75,15 @@ app.post("/sendemail", async (req, res) => {
           subject: "A message from Bulk Mail App",
           text: msg,
         });
+        results.push({ email, status: "Sent" });
         console.log("Email sent to:", email);
       } catch (err) {
+        results.push({ email, status: `Failed: ${err.message}` });
         console.error(`Failed to send email to ${email}:`, err.message);
       }
     }
 
-    res.status(200).json({ message: "Emails processed. Check logs for details." });
+    res.status(200).json({ message: "Emails processed.", details: results });
   } catch (err) {
     console.error("Error fetching email credentials:", err.message);
     res.status(500).json({ message: "Internal server error." });
