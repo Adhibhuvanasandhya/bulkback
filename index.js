@@ -51,44 +51,64 @@ mongoose.connect(process.env.DB_URI, { useNewUrlParser: true, useUnifiedTopology
 const Credential = mongoose.model("Credential", {}, "bulkmail");
 
 // Email-sending route
-app.post("/sendemail", async (req, res) => {
-  const { msg, emailList } = req.body;
+app.post("/sendemail",function(req,res){
+  var msg = req.body.msg
+  var emailList = req.body.emailList
 
-  try {
-    const credentials = await Credential.find();
-    if (!credentials || credentials.length === 0) {
-      return res.status(500).json({ message: "No email credentials found!" });
-    }
+  credential.find().then(function(data){
+      const transporter = nodemailer.createTransport({
+          service:"gmail",
+           auth: {
+             user: data[0].toJSON().user,
+             pass: data[0].toJSON().pass,
+           },
+         }); 
+  
+         
+      new Promise(async function(resolve,reject){
+          try{
+              for(var i=0; i<emailList.length;i++)
+                  {
+                      await transporter.sendMail(
+                          {
+                              from:"sandhyaponrajan.l@gmail.com",
+                              to:emailList[i],
+                              subject:"A message from Bulk Mail App",
+                              text:msg
+                          },
+                         
+                      )
+                      console.log("Email sent to:"+emailList[i])
+                  }
+                  resolve("Success")
+      
+          }
+          catch(error)
+          {
+              reject("Failed")
+          }
+          
+  
+      }).then(function(){
+          res.send(true)
+      })
+      .catch(function(){
+          res.send(false)
+      })
+  
+  }).catch(function(error){
+      console.log(error)
+  })
+  
 
-    const { user, pass } = credentials[0].toJSON();
 
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: { user, pass },
-    });
 
-    // Send emails to all recipients
-    for (const email of emailList) {
-      try {
-        await transporter.sendMail({
-          from: user,
-          to: email,
-          subject: "A message from Bulk Mail App",
-          text: msg,
-        });
-        console.log("Email sent to:", email);
-      } catch (err) {
-        console.error(`Error sending email to ${email}:`, err);
-        return res.status(500).json({ message: "Failed to send some emails." });
-      }
-    }
 
-    res.status(200).json({ message: "Emails sent successfully!" });
-  } catch (err) {
-    console.error("Error fetching email credentials:", err);
-    res.status(500).json({ message: "Internal server error." });
-  }
-});
+
+
+ 
+
+})
 
 // Start the server
 const PORT = process.env.PORT || 5000;
